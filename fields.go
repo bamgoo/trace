@@ -46,7 +46,6 @@ func SpanValues(span Span, instance, flag string) map[string]Any {
 		"timestamp":            span.Timestamp,
 		"attributes":           span.Attributes,
 		"resource":             span.Resource,
-		"driver":               instance,
 		"project":              project,
 		"profile":              profile,
 		"node":                 node,
@@ -69,20 +68,15 @@ func SpanValues(span Span, instance, flag string) map[string]Any {
 	return values
 }
 
-// ResolveFields parses setting.fields into source->target mapping.
+// ResolveFields parses fields config into source->target mapping.
 // Supports:
 //   - []string / []any: ["trace_id","span_id"]
 //   - map[string]any: { trace_id = "tid", span_id = "sid" }
-func ResolveFields(setting map[string]any, defaults map[string]string) map[string]string {
+func ResolveFields(raw Any, defaults map[string]string) map[string]string {
 	out := cloneFieldMap(defaults)
-	if setting == nil {
+	if raw == nil {
 		return out
 	}
-	raw, ok := setting["fields"]
-	if !ok || raw == nil {
-		return out
-	}
-
 	switch vv := raw.(type) {
 	case []string:
 		out = map[string]string{}

@@ -22,7 +22,10 @@ driver = "default"
 
 [trace.greptime]
 driver = "greptime"
+fields = { trace_id = "tid", span_id = "sid", parent_span_id = "psid", timestamp = "ts" }
 [trace.greptime.setting]
 host = "127.0.0.1"
 port = 4001
 ```
+
+`fields` should be configured on `trace.<conn>.fields` (not under `setting`).

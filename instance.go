@@ -48,7 +48,7 @@ func (inst *Instance) Format(span Span) string {
 		return ""
 	}
 	values := SpanValues(span, inst.Name, inst.Config.Flag)
-	fields := ResolveFields(inst.Setting, defaultOutputFields())
+	fields := ResolveFields(inst.Config.Fields, defaultOutputFields())
 	if inst.Config.Json {
 		dataMap := map[string]any{}
 		for source, target := range fields {
@@ -102,7 +102,6 @@ func defaultOutputFields() map[string]string {
 		"timestamp":            "timestamp",
 		"attributes":           "attributes",
 		"resource":             "resource",
-		"driver":               "driver",
 		"project":              "project",
 		"profile":              "profile",
 		"node":                 "node",

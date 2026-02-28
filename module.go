@@ -73,6 +73,7 @@ type (
 		Flag    string
 		Format  string
 		Sample  float64
+		Fields  Any
 		Setting Map
 	}
 )
@@ -183,6 +184,9 @@ func (m *Module) configure(name string, conf Map) {
 	if v, ok := parseFloat(conf["sample"]); ok {
 		cfg.Sample = v
 	}
+	if v, ok := normalizeFieldsConfig(conf["fields"]); ok {
+		cfg.Fields = v
+	}
 	if v, ok := castMap(conf["setting"]); ok {
 		cfg.Setting = v
 	}
@@ -228,6 +232,38 @@ func applySampleConfig(cfg *Config, sample Map) {
 	}
 	if v, ok := sample["sample_rules"]; ok {
 		cfg.Setting["sample_rules"] = v
+	}
+}
+
+func normalizeFieldsConfig(raw Any) (Any, bool) {
+	switch vv := raw.(type) {
+	case nil:
+		return nil, false
+	case []string:
+		out := make([]Any, 0, len(vv))
+		for _, one := range vv {
+			out = append(out, strings.TrimSpace(one))
+		}
+		return out, true
+	case []Any:
+		out := make([]Any, 0, len(vv))
+		for _, one := range vv {
+			out = append(out, strings.TrimSpace(fmt.Sprintf("%v", one)))
+		}
+		return out, true
+	case Map:
+		out := Map{}
+		for k, v := range vv {
+			key := strings.TrimSpace(k)
+			val := strings.TrimSpace(fmt.Sprintf("%v", v))
+			if key == "" || val == "" {
+				continue
+			}
+			out[key] = val
+		}
+		return out, true
+	default:
+		return nil, false
 	}
 }
 
