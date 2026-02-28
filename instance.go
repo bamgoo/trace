@@ -1,0 +1,133 @@
+package trace
+
+import (
+	"encoding/json"
+	"fmt"
+	"strings"
+	"sync"
+	"time"
+)
+
+type Instance struct {
+	conn Connection
+
+	Name    string
+	Config  Config
+	Setting map[string]any
+
+	sampleOnce   sync.Once
+	samplePolicy samplePolicy
+}
+
+func (inst *Instance) Allow(span Span) bool {
+	return inst.AllowWithFactor(span, 1)
+}
+
+func (inst *Instance) AllowWithFactor(span Span, factor float64) bool {
+	if inst == nil {
+		return false
+	}
+	inst.sampleOnce.Do(func() {
+		inst.samplePolicy = buildSamplePolicy(inst.Setting)
+	})
+	r := chooseSampleRatio(span, inst.Config.Sample, inst.samplePolicy)
+	r *= clamp01(factor)
+	r = clamp01(r)
+	if r >= 1 {
+		return true
+	}
+	if r <= 0 {
+		return false
+	}
+	x := hash01(sampleKey(span, inst.samplePolicy.HashBy))
+	return x <= r
+}
+
+func (inst *Instance) Format(span Span) string {
+	if inst == nil {
+		return ""
+	}
+	values := SpanValues(span, inst.Name, inst.Config.Flag)
+	fields := ResolveFields(inst.Setting, defaultOutputFields())
+	if inst.Config.Json {
+		dataMap := map[string]any{}
+		for source, target := range fields {
+			if target == "" {
+				continue
+			}
+			if val, ok := values[source]; ok {
+				dataMap[target] = val
+			}
+		}
+		data, _ := json.Marshal(dataMap)
+		return string(data)
+	}
+
+	message := inst.Config.Format
+	if message == "" {
+		message = "%time% [%status%] %name% trace=%traceId% span=%spanId% cost=%costMs%ms"
+	}
+	for key, val := range values {
+		message = strings.ReplaceAll(message, "%"+key+"%", fmt.Sprintf("%v", val))
+	}
+	for source, target := range fields {
+		if target == "" {
+			continue
+		}
+		if val, ok := values[source]; ok {
+			message = strings.ReplaceAll(message, "%"+target+"%", fmt.Sprintf("%v", val))
+		}
+	}
+	return message
+}
+
+func defaultOutputFields() map[string]string {
+	return map[string]string{
+		"time":                 "time",
+		"trace_id":             "trace_id",
+		"span_id":              "span_id",
+		"parent_span_id":       "parent_span_id",
+		"name":                 "name",
+		"kind":                 "kind",
+		"service_name":         "service_name",
+		"target":               "target",
+		"status":               "status",
+		"status_code":          "status_code",
+		"status_message":       "status_message",
+		"duration_ms":          "duration_ms",
+		"start_ms":             "start_ms",
+		"end_ms":               "end_ms",
+		"start_time_unix_nano": "start_time_unix_nano",
+		"end_time_unix_nano":   "end_time_unix_nano",
+		"timestamp":            "timestamp",
+		"attributes":           "attributes",
+		"resource":             "resource",
+		"driver":               "driver",
+		"project":              "project",
+		"profile":              "profile",
+		"node":                 "node",
+		"flag":                 "flag",
+	}
+}
+
+func normalizeConfig(cfg Config) Config {
+	if cfg.Driver == "" {
+		cfg.Driver = "default"
+	}
+	if cfg.Buffer <= 0 {
+		cfg.Buffer = 1024
+	}
+	if cfg.Timeout <= 0 {
+		cfg.Timeout = 200 * time.Millisecond
+	}
+	if cfg.Format == "" {
+		cfg.Format = "%time% [%status%] %name% trace=%traceId% span=%spanId% cost=%costMs%ms"
+	}
+	if cfg.Sample < 0 {
+		cfg.Sample = 1
+	}
+	if cfg.Sample > 1 {
+		cfg.Sample = 1
+	}
+	return cfg
+}
