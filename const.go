@@ -8,6 +8,7 @@ const NAME = "TRACE"
 
 const (
 	StatusOK    = "ok"
+	StatusFail  = "fail"
 	StatusError = "error"
 )
 

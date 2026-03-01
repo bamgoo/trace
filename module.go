@@ -474,36 +474,30 @@ func (m *Module) Write(span Span) {
 	if span.Time.IsZero() {
 		span.Time = time.Now()
 	}
-	if span.Status == "" {
-		span.Status = StatusOK
+	if span.Status == StatusError {
+		span.Status = StatusFail
 	}
-	if span.StatusCode == "" {
-		if span.Status == StatusError {
-			span.StatusCode = "STATUS_CODE_ERROR"
+	if span.Status == "" {
+		if span.Code == 0 {
+			span.Status = StatusOK
 		} else {
-			span.StatusCode = "STATUS_CODE_OK"
+			span.Status = StatusFail
 		}
 	}
-	if span.StartMs <= 0 {
-		span.StartMs = span.Time.UnixMilli()
+	if span.Code == 0 && span.Status != "" && span.Status != StatusOK {
+		span.Code = 1
 	}
-	if span.StartTimeUnixNano <= 0 {
-		span.StartTimeUnixNano = span.StartMs * int64(time.Millisecond)
+	if span.Start <= 0 {
+		span.Start = span.Time.UnixNano()
 	}
-	if span.EndMs <= 0 {
-		span.EndMs = span.Time.UnixMilli()
+	if span.End <= 0 {
+		span.End = span.Time.UnixNano()
 	}
-	if span.EndTimeUnixNano <= 0 {
-		span.EndTimeUnixNano = span.EndMs * int64(time.Millisecond)
+	if span.Cost < 0 {
+		span.Cost = 0
 	}
-	if span.DurationMs < 0 {
-		span.DurationMs = 0
-	}
-	if span.DurationMs == 0 && span.EndMs >= span.StartMs {
-		span.DurationMs = span.EndMs - span.StartMs
-	}
-	if span.Timestamp <= 0 {
-		span.Timestamp = span.EndMs
+	if span.Cost == 0 && span.End >= span.Start {
+		span.Cost = span.End - span.Start
 	}
 	if span.Attributes == nil {
 		span.Attributes = Map{}
@@ -637,16 +631,16 @@ func (m *Module) Trace(meta *bamgoo.Meta, name string, status string, attrs Map)
 	}
 	if status != "" {
 		h.span.Status = strings.ToLower(strings.TrimSpace(status))
-		if h.span.Status == StatusError {
-			h.span.StatusCode = "STATUS_CODE_ERROR"
+		if h.span.Status == StatusOK {
+			h.span.Code = 0
 		} else {
-			h.span.StatusCode = "STATUS_CODE_OK"
+			h.span.Code = 1
 		}
 	}
-	if h.span.Status == StatusError {
+	if h.span.Status != StatusOK {
 		if attrs != nil {
 			if errText, ok := attrs["error"].(string); ok && errText != "" {
-				h.span.StatusMessage = errText
+				h.span.Result = errText
 			}
 		}
 	}

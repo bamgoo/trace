@@ -3,6 +3,8 @@ package trace
 import (
 	"fmt"
 	"hash/fnv"
+	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -11,25 +13,22 @@ import (
 )
 
 type Span struct {
-	Time              time.Time `json:"time"`
-	TraceId           string    `json:"trace_id,omitempty"`
-	SpanId            string    `json:"span_id,omitempty"`
-	ParentSpanId      string    `json:"parent_span_id,omitempty"`
-	Name              string    `json:"name,omitempty"`
-	Kind              string    `json:"kind,omitempty"`
-	ServiceName       string    `json:"service_name,omitempty"`
-	Target            string    `json:"target,omitempty"`
-	Status            string    `json:"status,omitempty"`
-	StatusCode        string    `json:"status_code,omitempty"`
-	StatusMessage     string    `json:"status_message,omitempty"`
-	DurationMs        int64     `json:"duration_ms"`
-	StartMs           int64     `json:"start_ms"`
-	EndMs             int64     `json:"end_ms"`
-	StartTimeUnixNano int64     `json:"start_time_unix_nano"`
-	EndTimeUnixNano   int64     `json:"end_time_unix_nano"`
-	Timestamp         int64     `json:"timestamp"`
-	Attributes        Map       `json:"attributes,omitempty"`
-	Resource          Map       `json:"resource,omitempty"`
+	Time         time.Time `json:"time"`
+	TraceId      string    `json:"trace_id,omitempty"`
+	SpanId       string    `json:"span_id,omitempty"`
+	ParentSpanId string    `json:"parent_span_id,omitempty"`
+	Name         string    `json:"name,omitempty"`
+	Kind         string    `json:"kind,omitempty"`
+	ServiceName  string    `json:"service_name,omitempty"`
+	Target       string    `json:"target,omitempty"`
+	Status       string    `json:"status,omitempty"`
+	Code         int       `json:"code"`
+	Result       string    `json:"result,omitempty"`
+	Cost         int64     `json:"cost"`
+	Start        int64     `json:"start"`
+	End          int64     `json:"end"`
+	Attributes   Map       `json:"attributes,omitempty"`
+	Resource     Map       `json:"resource,omitempty"`
 }
 
 type Handle struct {
@@ -56,17 +55,18 @@ func Begin(meta *bamgoo.Meta, name string, attrs ...Map) *Handle {
 	meta.SpanId(spanId)
 	meta.PushSpanFrame(parent, prevParent)
 
+	now := time.Now()
 	span := Span{
-		TraceId:           traceId,
-		SpanId:            spanId,
-		ParentSpanId:      parent,
-		Name:              name,
-		Status:            StatusOK,
-		StatusCode:        "STATUS_CODE_OK",
-		StartMs:           time.Now().UnixMilli(),
-		StartTimeUnixNano: time.Now().UnixNano(),
-		Attributes:        Map{},
-		Resource:          Map{},
+		TraceId:      traceId,
+		SpanId:       spanId,
+		ParentSpanId: parent,
+		Name:         name,
+		Status:       StatusOK,
+		Code:         0,
+		Time:         now,
+		Start:        now.UnixNano(),
+		Attributes:   Map{},
+		Resource:     Map{},
 	}
 	identity := bamgoo.Identity()
 	span.Resource["bamgoo.project"] = identity.Project
@@ -83,15 +83,37 @@ func Begin(meta *bamgoo.Meta, name string, attrs ...Map) *Handle {
 			span.ServiceName = v
 			span.Resource["service.name"] = v
 		}
+		if v, ok := attrs[0]["entry"].(string); ok {
+			span.Target = v
+		}
+		if v, ok := attrs[0]["step"].(string); ok && v != "" {
+			span.Name = v
+		}
+		if v, ok := attrs[0]["status"].(string); ok && v != "" {
+			span.Status = strings.ToLower(strings.TrimSpace(v))
+		}
 		if v, ok := attrs[0]["target"].(string); ok {
 			span.Target = v
 		}
-		if v, ok := attrs[0]["status_code"].(string); ok && v != "" {
-			span.StatusCode = v
+		if v, ok := parseCode(attrs[0]["code"]); ok {
+			span.Code = v
 		}
-		if v, ok := attrs[0]["status_message"].(string); ok && v != "" {
-			span.StatusMessage = v
+		if v, ok := attrs[0]["result"].(string); ok && v != "" {
+			span.Result = v
 		}
+	}
+
+	if span.Kind == "" {
+		span.Kind = strings.TrimSpace(meta.TraceKind())
+	}
+	if span.Target == "" {
+		span.Target = strings.TrimSpace(meta.TraceEntry())
+	}
+	if span.Kind != "" {
+		meta.TraceKind(span.Kind)
+	}
+	if span.Target != "" {
+		meta.TraceEntry(span.Target)
 	}
 
 	return &Handle{
@@ -101,20 +123,59 @@ func Begin(meta *bamgoo.Meta, name string, attrs ...Map) *Handle {
 	}
 }
 
-func (h *Handle) End(errs ...error) {
+func (h *Handle) End(results ...Any) {
 	if h == nil {
 		return
 	}
 	now := time.Now()
 	h.span.Time = now
-	h.span.EndMs = now.UnixMilli()
-	h.span.EndTimeUnixNano = now.UnixNano()
-	h.span.DurationMs = time.Since(h.start).Milliseconds()
-	h.span.Timestamp = now.UnixMilli()
-	if len(errs) > 0 && errs[0] != nil {
-		h.span.Status = StatusError
-		h.span.StatusCode = "STATUS_CODE_ERROR"
-		h.span.StatusMessage = errs[0].Error()
+	h.span.End = now.UnixNano()
+	h.span.Cost = time.Since(h.start).Nanoseconds()
+	okCode := bamgoo.OK.Code()
+	okStatus := strings.ToLower(strings.TrimSpace(bamgoo.OK.Status()))
+	if okStatus == "" {
+		okStatus = StatusOK
+	}
+	failCode := bamgoo.Fail.Code()
+	failStatus := strings.ToLower(strings.TrimSpace(bamgoo.Fail.Status()))
+	if failStatus == "" {
+		failStatus = StatusFail
+	}
+
+	// Default: success.
+	h.span.Code = okCode
+	h.span.Status = okStatus
+	h.span.Result = ""
+
+	var first Any
+	for _, item := range results {
+		if item != nil {
+			first = item
+			break
+		}
+	}
+	if first != nil {
+		switch v := first.(type) {
+		case Res:
+			h.span.Code = v.Code()
+			h.span.Status = strings.ToLower(strings.TrimSpace(v.Status()))
+			if h.span.Status == "" {
+				if h.span.Code == okCode {
+					h.span.Status = okStatus
+				} else {
+					h.span.Status = failStatus
+				}
+			}
+			h.span.Result = v.Error()
+		case error:
+			h.span.Code = failCode
+			h.span.Status = failStatus
+			h.span.Result = v.Error()
+		default:
+			h.span.Code = failCode
+			h.span.Status = failStatus
+			h.span.Result = fmt.Sprintf("%v", v)
+		}
 	}
 	Write(h.span)
 	if h.meta != nil {
@@ -132,8 +193,10 @@ func Emit(meta *bamgoo.Meta, name string, status string, attrs ...Map) {
 	}
 	if status != "" {
 		h.span.Status = status
-		if status == StatusError {
-			h.span.StatusCode = "STATUS_CODE_ERROR"
+		if status == StatusOK {
+			h.span.Code = 0
+		} else {
+			h.span.Code = 1
 		}
 	}
 	h.End()
@@ -152,4 +215,20 @@ func hash01(s string) float64 {
 	_, _ = h.Write([]byte(s))
 	v := h.Sum64()
 	return float64(v%1000000) / 1000000.0
+}
+
+func parseCode(v Any) (int, bool) {
+	switch vv := v.(type) {
+	case int:
+		return vv, true
+	case int64:
+		return int(vv), true
+	case float64:
+		return int(vv), true
+	case string:
+		if n, err := strconv.Atoi(strings.TrimSpace(vv)); err == nil {
+			return n, true
+		}
+	}
+	return 0, false
 }

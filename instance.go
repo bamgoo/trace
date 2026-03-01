@@ -65,7 +65,7 @@ func (inst *Instance) Format(span Span) string {
 
 	message := inst.Config.Format
 	if message == "" {
-		message = "%time% [%status%] %name% trace=%traceId% span=%spanId% cost=%costMs%ms"
+		message = "%ts% [%status%] %step% trace=%traceId% span=%spanId% cost=%cost%ns"
 	}
 	for key, val := range values {
 		message = strings.ReplaceAll(message, "%"+key+"%", fmt.Sprintf("%v", val))
@@ -83,29 +83,25 @@ func (inst *Instance) Format(span Span) string {
 
 func defaultOutputFields() map[string]string {
 	return map[string]string{
-		"time":                 "time",
-		"trace_id":             "trace_id",
-		"span_id":              "span_id",
-		"parent_span_id":       "parent_span_id",
-		"name":                 "name",
-		"kind":                 "kind",
-		"service_name":         "service_name",
-		"target":               "target",
-		"status":               "status",
-		"status_code":          "status_code",
-		"status_message":       "status_message",
-		"duration_ms":          "duration_ms",
-		"start_ms":             "start_ms",
-		"end_ms":               "end_ms",
-		"start_time_unix_nano": "start_time_unix_nano",
-		"end_time_unix_nano":   "end_time_unix_nano",
-		"timestamp":            "timestamp",
-		"attributes":           "attributes",
-		"resource":             "resource",
-		"project":              "project",
-		"profile":              "profile",
-		"node":                 "node",
-		"flag":                 "flag",
+		"time":           "time",
+		"start":          "start",
+		"end":            "end",
+		"cost":           "cost",
+		"trace_id":       "trace_id",
+		"span_id":        "span_id",
+		"parent_span_id": "parent_span_id",
+		"step":           "step",
+		"entry":          "entry",
+		"kind":           "kind",
+		"status":         "status",
+		"code":           "code",
+		"result":         "result",
+		"attributes":     "attributes",
+		"resource":       "resource",
+		"project":        "project",
+		"profile":        "profile",
+		"node":           "node",
+		"flag":           "flag",
 	}
 }
 
@@ -120,7 +116,7 @@ func normalizeConfig(cfg Config) Config {
 		cfg.Timeout = 200 * time.Millisecond
 	}
 	if cfg.Format == "" {
-		cfg.Format = "%time% [%status%] %name% trace=%traceId% span=%spanId% cost=%costMs%ms"
+		cfg.Format = "%ts% [%status%] %step% trace=%traceId% span=%spanId% cost=%cost%ns"
 	}
 	if cfg.Sample < 0 {
 		cfg.Sample = 1

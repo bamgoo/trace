@@ -26,44 +26,62 @@ func SpanValues(span Span, instance, flag string) map[string]Any {
 		}
 	}
 
+	attrs := sanitizeTraceAttrs(span.Attributes)
 	values := map[string]Any{
-		"time":                 span.Time.Format("2006-01-02 15:04:05.000"),
-		"trace_id":             span.TraceId,
-		"span_id":              span.SpanId,
-		"parent_span_id":       span.ParentSpanId,
-		"name":                 span.Name,
-		"kind":                 span.Kind,
-		"service_name":         span.ServiceName,
-		"target":               span.Target,
-		"status":               span.Status,
-		"status_code":          span.StatusCode,
-		"status_message":       span.StatusMessage,
-		"duration_ms":          span.DurationMs,
-		"start_ms":             span.StartMs,
-		"end_ms":               span.EndMs,
-		"start_time_unix_nano": span.StartTimeUnixNano,
-		"end_time_unix_nano":   span.EndTimeUnixNano,
-		"timestamp":            span.Timestamp,
-		"attributes":           span.Attributes,
-		"resource":             span.Resource,
-		"project":              project,
-		"profile":              profile,
-		"node":                 node,
-		"flag":                 flag,
-		"ts":                   span.Time,
+		"time":           span.Time.UnixNano(),
+		"start":          span.Start,
+		"end":            span.End,
+		"cost":           span.Cost,
+		"trace_id":       span.TraceId,
+		"span_id":        span.SpanId,
+		"parent_span_id": span.ParentSpanId,
+		"step":           span.Name,
+		"kind":           span.Kind,
+		"entry":          span.Target,
+		"status":         span.Status,
+		"code":           span.Code,
+		"result":         span.Result,
+		"attributes":     attrs,
+		"resource":       span.Resource,
+		"project":        project,
+		"profile":        profile,
+		"node":           node,
+		"flag":           flag,
+		"ts":             span.Time,
 		// Compat aliases
+		"name":         span.Name,
+		"span":         span.Name,
 		"traceId":      span.TraceId,
 		"spanId":       span.SpanId,
 		"parentSpanId": span.ParentSpanId,
 		"service":      span.ServiceName,
-		"error":        span.StatusMessage,
-		"cost_ms":      span.DurationMs,
-		"costMs":       span.DurationMs,
-		"startMs":      span.StartMs,
-		"endMs":        span.EndMs,
-		"attrs":        span.Attributes,
+		"error":        span.Result,
+		"costMs":       span.Cost / int64(1e6),
+		"startMs":      span.Start / int64(1e6),
+		"endMs":        span.End / int64(1e6),
+		"attrs":        attrs,
 		"parent_id":    span.ParentSpanId,
 		"instance":     instance,
+	}
+	if v, ok := stringAttr(span.Attributes, "step"); ok && v != "" {
+		values["step"] = v
+		values["name"] = v
+		values["span"] = v
+	} else if v, ok := stringAttr(span.Attributes, "name"); ok && v != "" {
+		values["step"] = v
+		values["name"] = v
+		values["span"] = v
+	}
+	if v, ok := stringAttr(span.Attributes, "entry"); ok && v != "" {
+		values["entry"] = v
+	}
+	if v, ok := stringAttr(span.Attributes, "target"); ok && v != "" && values["entry"] == "" {
+		values["entry"] = v
+	}
+	if values["step"] == "" {
+		values["step"] = "internal"
+		values["name"] = "internal"
+		values["span"] = "internal"
 	}
 	return values
 }
@@ -117,6 +135,33 @@ func ResolveFields(raw Any, defaults map[string]string) map[string]string {
 func cloneFieldMap(in map[string]string) map[string]string {
 	out := map[string]string{}
 	for k, v := range in {
+		out[k] = v
+	}
+	return out
+}
+
+func stringAttr(m Map, key string) (string, bool) {
+	if m == nil || key == "" {
+		return "", false
+	}
+	v, ok := m[key]
+	if !ok {
+		return "", false
+	}
+	s, ok := v.(string)
+	return s, ok
+}
+
+func sanitizeTraceAttrs(in Map) Map {
+	if in == nil {
+		return Map{}
+	}
+	out := Map{}
+	for k, v := range in {
+		switch k {
+		case "kind", "service", "entry", "step", "status", "code", "result", "target":
+			continue
+		}
 		out[k] = v
 	}
 	return out

@@ -76,7 +76,7 @@ func buildSamplePolicy(setting map[string]any) samplePolicy {
 }
 
 func chooseSampleRatio(span Span, baseRatio float64, policy samplePolicy) float64 {
-	if policy.ErrorAlways && (span.StatusCode == "STATUS_CODE_ERROR" || span.Status == StatusError) {
+	if policy.ErrorAlways && (span.Code != 0 || span.Status == StatusFail || span.Status == StatusError) {
 		return 1
 	}
 	ratio := clamp01(baseRatio)

@@ -38,7 +38,7 @@ func (c *defaultConnection) Write(spans ...Span) error {
 	var errBuf bytes.Buffer
 	for _, span := range spans {
 		line := c.instance.Format(span) + "\n"
-		if span.Status == StatusError {
+		if span.Code != 0 || (span.Status != "" && span.Status != StatusOK) {
 			_, _ = errBuf.WriteString(line)
 		} else {
 			_, _ = outBuf.WriteString(line)
