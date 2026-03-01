@@ -3,9 +3,10 @@ package trace
 import (
 	"fmt"
 	"strings"
+	"time"
 
-	"github.com/infrago/infra"
 	. "github.com/infrago/base"
+	"github.com/infrago/infra"
 )
 
 // SpanValues returns all known trace fields (standard + compat aliases).
@@ -47,7 +48,7 @@ func SpanValues(span Span, instance, flag string) map[string]Any {
 		"profile":        profile,
 		"node":           node,
 		"flag":           flag,
-		"ts":             span.Time,
+		"ts":             formatTraceTS(span.Time),
 		// Compat aliases
 		"name":         span.Name,
 		"span":         span.Name,
@@ -165,4 +166,11 @@ func sanitizeTraceAttrs(in Map) Map {
 		out[k] = v
 	}
 	return out
+}
+
+func formatTraceTS(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.Format("2006-01-02 15:04:05.000000")
 }
