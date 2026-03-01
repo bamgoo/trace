@@ -8,8 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/bamgoo/bamgoo"
-	. "github.com/bamgoo/base"
+	"github.com/infrago/infra"
+	. "github.com/infrago/base"
 )
 
 type Span struct {
@@ -32,16 +32,16 @@ type Span struct {
 }
 
 type Handle struct {
-	meta  *bamgoo.Meta
+	meta  *infra.Meta
 	span  Span
 	start time.Time
 }
 
 var spanSeq atomic.Uint64
 
-func Begin(meta *bamgoo.Meta, name string, attrs ...Map) *Handle {
+func Begin(meta *infra.Meta, name string, attrs ...Map) *Handle {
 	if meta == nil {
-		meta = bamgoo.NewMeta()
+		meta = infra.NewMeta()
 	}
 	traceId := meta.TraceId()
 	if traceId == "" {
@@ -68,10 +68,10 @@ func Begin(meta *bamgoo.Meta, name string, attrs ...Map) *Handle {
 		Attributes:   Map{},
 		Resource:     Map{},
 	}
-	identity := bamgoo.Identity()
-	span.Resource["bamgoo.project"] = identity.Project
-	span.Resource["bamgoo.profile"] = identity.Profile
-	span.Resource["bamgoo.node"] = identity.Node
+	identity := infra.Identity()
+	span.Resource["infra.project"] = identity.Project
+	span.Resource["infra.profile"] = identity.Profile
+	span.Resource["infra.node"] = identity.Node
 	if len(attrs) > 0 && attrs[0] != nil {
 		for k, v := range attrs[0] {
 			span.Attributes[k] = v
@@ -131,13 +131,13 @@ func (h *Handle) End(results ...Any) {
 	h.span.Time = now
 	h.span.End = now.UnixNano()
 	h.span.Cost = time.Since(h.start).Nanoseconds()
-	okCode := bamgoo.OK.Code()
-	okStatus := strings.ToLower(strings.TrimSpace(bamgoo.OK.Status()))
+	okCode := infra.OK.Code()
+	okStatus := strings.ToLower(strings.TrimSpace(infra.OK.Status()))
 	if okStatus == "" {
 		okStatus = StatusOK
 	}
-	failCode := bamgoo.Fail.Code()
-	failStatus := strings.ToLower(strings.TrimSpace(bamgoo.Fail.Status()))
+	failCode := infra.Fail.Code()
+	failStatus := strings.ToLower(strings.TrimSpace(infra.Fail.Status()))
 	if failStatus == "" {
 		failStatus = StatusFail
 	}
@@ -186,7 +186,7 @@ func (h *Handle) End(results ...Any) {
 	}
 }
 
-func Emit(meta *bamgoo.Meta, name string, status string, attrs ...Map) {
+func Emit(meta *infra.Meta, name string, status string, attrs ...Map) {
 	h := Begin(meta, name, attrs...)
 	if h == nil {
 		return

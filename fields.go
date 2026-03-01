@@ -4,24 +4,24 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/bamgoo/bamgoo"
-	. "github.com/bamgoo/base"
+	"github.com/infrago/infra"
+	. "github.com/infrago/base"
 )
 
 // SpanValues returns all known trace fields (standard + compat aliases).
 func SpanValues(span Span, instance, flag string) map[string]Any {
-	identity := bamgoo.Identity()
+	identity := infra.Identity()
 	project := identity.Project
 	profile := identity.Profile
 	node := identity.Node
 	if span.Resource != nil {
-		if v, ok := span.Resource["bamgoo.project"].(string); ok && v != "" {
+		if v, ok := span.Resource["infra.project"].(string); ok && v != "" {
 			project = v
 		}
-		if v, ok := span.Resource["bamgoo.profile"].(string); ok && v != "" {
+		if v, ok := span.Resource["infra.profile"].(string); ok && v != "" {
 			profile = v
 		}
-		if v, ok := span.Resource["bamgoo.node"].(string); ok && v != "" {
+		if v, ok := span.Resource["infra.node"].(string); ok && v != "" {
 			node = v
 		}
 	}

@@ -9,12 +9,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/bamgoo/bamgoo"
-	. "github.com/bamgoo/base"
+	"github.com/infrago/infra"
+	. "github.com/infrago/base"
 )
 
 func init() {
-	bamgoo.Mount(module)
+	infra.Mount(module)
 }
 
 var module = &Module{
@@ -93,12 +93,12 @@ func (m *Module) RegisterDriver(name string, driver Driver) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	if name == "" {
-		name = bamgoo.DEFAULT
+		name = infra.DEFAULT
 	}
 	if driver == nil {
 		panic(errInvalidTraceDriver)
 	}
-	if bamgoo.Override() {
+	if infra.Override() {
 		m.drivers[name] = driver
 	} else if _, ok := m.drivers[name]; !ok {
 		m.drivers[name] = driver
@@ -112,9 +112,9 @@ func (m *Module) RegisterConfig(name string, cfg Config) {
 		return
 	}
 	if name == "" {
-		name = bamgoo.DEFAULT
+		name = infra.DEFAULT
 	}
-	if bamgoo.Override() {
+	if infra.Override() {
 		m.configs[name] = cfg
 	} else if _, ok := m.configs[name]; !ok {
 		m.configs[name] = cfg
@@ -154,12 +154,12 @@ func (m *Module) Config(global Map) {
 		}
 	}
 	if len(root) > 0 {
-		m.configure(bamgoo.DEFAULT, root)
+		m.configure(infra.DEFAULT, root)
 	}
 }
 
 func (m *Module) configure(name string, conf Map) {
-	cfg := Config{Driver: bamgoo.DEFAULT, Sample: 1}
+	cfg := Config{Driver: infra.DEFAULT, Sample: 1}
 	if existing, ok := m.configs[name]; ok {
 		cfg = existing
 	}
@@ -274,7 +274,7 @@ func (m *Module) Setup() {
 		return
 	}
 	if len(m.configs) == 0 {
-		m.configs[bamgoo.DEFAULT] = normalizeConfig(Config{Driver: bamgoo.DEFAULT, Sample: 1})
+		m.configs[infra.DEFAULT] = normalizeConfig(Config{Driver: infra.DEFAULT, Sample: 1})
 		return
 	}
 	for name, cfg := range m.configs {
@@ -354,7 +354,7 @@ func (m *Module) Start() {
 	}
 	go m.loop(flushEvery)
 	m.started = true
-	fmt.Printf("bamgoo trace module is running with %d connections.\n", len(m.instances))
+	fmt.Printf("infrago trace module is running with %d connections.\n", len(m.instances))
 }
 
 func (m *Module) Stop() {
@@ -620,11 +620,11 @@ func (r *instanceRunner) write(batch []Span) {
 	r.lastWriteLatencyMs.Store(time.Since(start).Milliseconds())
 }
 
-func (m *Module) Begin(meta *bamgoo.Meta, name string, attrs Map) bamgoo.TraceSpan {
+func (m *Module) Begin(meta *infra.Meta, name string, attrs Map) infra.TraceSpan {
 	return Begin(meta, name, attrs)
 }
 
-func (m *Module) Trace(meta *bamgoo.Meta, name string, status string, attrs Map) error {
+func (m *Module) Trace(meta *infra.Meta, name string, status string, attrs Map) error {
 	h := Begin(meta, name, attrs)
 	if h == nil {
 		return nil

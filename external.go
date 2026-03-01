@@ -1,6 +1,6 @@
 package trace
 
-import . "github.com/bamgoo/base"
+import . "github.com/infrago/base"
 
 func Write(span Span) {
 	module.Write(span)

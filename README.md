@@ -1,6 +1,6 @@
 # trace
 
-bamgoo trace module with multi-connection fanout.
+infrago trace module with multi-connection fanout.
 
 ## config
 

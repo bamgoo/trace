@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	. "github.com/bamgoo/base"
+	. "github.com/infrago/base"
 )
 
 type sampleRule struct {
