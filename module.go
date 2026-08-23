@@ -2,15 +2,14 @@ package trace
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/infrago/infra"
 	. "github.com/infrago/base"
+	"github.com/infrago/infra"
 )
 
 func init() {
@@ -354,7 +353,7 @@ func (m *Module) Start() {
 	}
 	go m.loop(flushEvery)
 	m.started = true
-	fmt.Printf("infrago trace module is running with %d connections.\n", len(m.instances))
+	infra.Log(infra.LogLevelInfo, "trace", "module started", Map{"connections": len(m.instances)})
 }
 
 func (m *Module) Stop() {
@@ -539,7 +538,7 @@ func (m *Module) dynamicSampleFactor(queueLen, queueCap int) float64 {
 	return factor
 }
 
-func (m *Module) Stats() Map {
+func (m *Module) Snapshot() Map {
 	m.mutex.RLock()
 	queueLen := 0
 	queueCap := 0
@@ -615,7 +614,9 @@ func (r *instanceRunner) write(batch []Span) {
 	if err := r.inst.conn.Write(batch...); err != nil {
 		r.module.writeErrorCount.Add(1)
 		r.writeErrorCount.Add(1)
-		_, _ = fmt.Fprintln(os.Stderr, "trace write failed:", err.Error())
+		infra.Log(infra.LogLevelError, "trace", "write failed", Map{
+			"connection": r.name, "error": err.Error(), "spans": len(batch),
+		})
 	}
 	r.lastWriteLatencyMs.Store(time.Since(start).Milliseconds())
 }

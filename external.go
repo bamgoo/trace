@@ -7,5 +7,5 @@ func Write(span Span) {
 }
 
 func Stats() Map {
-	return module.Stats()
+	return module.Snapshot()
 }
